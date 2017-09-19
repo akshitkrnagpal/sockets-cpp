@@ -37,15 +37,15 @@ int main()
 	( c < 0 ) ? cout<<"Error. Could not connect to socket.\n"<<strerror(errno)<<endl : cout<<"Socket connected.\n";
 
 	// Read
-	int valread = read( fd , buffer, 1024);
-    cout<<"Recieved message => "<<buffer<<endl;
+	//int valread = read( fd , buffer, 1024);
+    //cout<<"Recieved message => "<<buffer<<endl;
 
     // Send
-    while(strcmp(msg,"close")!=0){
+    //while(strcmp(msg,"close")!=0){
     	cout<<"Enter message to send => ";
 		cin>>msg;
    		send(fd,msg,strlen(msg),0);
-    }
+    //}
     close(fd);
    	
 
