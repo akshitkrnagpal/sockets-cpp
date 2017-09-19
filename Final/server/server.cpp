@@ -1,6 +1,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/dir.h>
+#include <sys/param.h>
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -8,6 +12,9 @@
 #include <pthread.h>
 #include <cstring>
 #include <sstream>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 2048
@@ -17,6 +24,14 @@ using namespace std;
 static int new_socket;
 
 void * Menu(void * tid);
+
+int file_select(const struct dirent *entry)
+{
+	if ((entry->d_name == ".") ||(entry->d_name == ".."))
+		return 0;
+	else
+		return 1;
+}
 
 int main(int argc, char* argv[])
 {
@@ -86,11 +101,19 @@ void * Menu(void * tid)
 {
 	int clientId = pthread_self();
 	cout<< "Client Connected (with id = "<< clientId <<" )"<<endl;
+
 	char buffer[BUFFER_SIZE];
-	string command(buffer);
 	
+	string command(buffer);
+
 	do
 	{
+		bzero(buffer,BUFFER_SIZE);
+		getcwd(buffer,BUFFER_SIZE);
+		string current_directory(buffer);
+		write(new_socket,buffer,strlen(buffer));
+		write(new_socket,": ",2);
+		
 		bzero(buffer,BUFFER_SIZE);
 		read(new_socket,buffer,BUFFER_SIZE);
 
@@ -100,35 +123,40 @@ void * Menu(void * tid)
 			if(command.find(" "))
 			{
 				string operation = command.substr(0,command.find(' '));
-				stringstream operands(command.substr(command.find(' ')+1));
+				stringstream params(command.substr(command.find(' ')+1));
+				string temp;
 				
 				int result,n;
 				size_t pos = 0;
+				bool flag = false;
 
 				if(operation == "neg")
 				{
-					operands >> n;
+					params >> n;
 					result = -n;
+					flag=true;
 				}
 				else if (operation == "add")
 				{
 					result = 0;
-					while( operands >> n )
+					while( params >> n )
 					{
 						result+=n;
 					}
+					flag=true;
 				}
 				else if (operation == "mul")
 				{
 					result = 1;
-					while( operands >> n )
+					while( params >> n )
 					{
 						result*=n;
 					}
+					flag=true;
 				}
-				
+
 				string response;
-				if( result )
+				if( flag )
 				{
 					stringstream response_stream;
 					response_stream << result;
@@ -137,11 +165,73 @@ void * Menu(void * tid)
 				}
 				else
 				{
-					response = "No command \""+operation+"\" found.";
+					if(operation == "pwd")
+					{
+						getcwd(buffer,BUFFER_SIZE);
+						response = string(buffer);
+					}
+					else if(operation == "cd")
+					{
+						params >> temp;
+						chdir(temp.c_str());
+					}
+					/*else if( operation == "ls")
+					{
+						//cout<<"asdnasd";
+						struct dirent **files;
+						int file_select(const struct dirent*);
+						char pathname[100];
+
+						int count = scandir(pathname, &files, file_select, alphasort);
+
+						response="";
+						for (int i=0;i<count;i++)
+						{
+							response+=string(files[i]->d_name)+"\n";
+						}
+					}*/
+					else if( operation == "filedown" )
+					{
+						char filename[50];
+						params >> filename;
+
+						FILE *file = fopen(filename,"r");
+						if(!file)
+						{
+							while( fread(buffer,BUFFER_SIZE,1,file) )
+							{
+								write(new_socket,buffer,strlen(buffer));
+							}
+							fclose(file);
+						}
+						else 
+						{
+							response = "File not found!";
+						}
+					}
+					else if( operation == "fileup" )
+					{
+						char filename[50];
+						params >> filename;
+
+						FILE *file = fopen(filename,"w");
+						if(!file)
+						{
+							while( recv(new_socket,buffer,BUFFER_SIZE,0) )
+							{
+								fwrite(buffer,strlen(buffer),1,file);
+							}
+							fclose(file);
+						}
+						else 
+						{
+							response = "Could not create file!";
+						}
+					}
 				}
 				
 				strcpy(buffer,response.c_str());
-				send(new_socket,buffer,strlen(buffer),0);
+				write(new_socket,buffer,strlen(buffer));
 			}
 
 		}

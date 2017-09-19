@@ -1,14 +1,25 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/dir.h>
+#include <sys/param.h>
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <netdb.h>
 #include <errno.h>
 #include <pthread.h>
 #include <cstring>
+#include <sstream>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <netdb.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 
 #define BUFFER_SIZE 2048
 
@@ -57,17 +68,49 @@ int main(int argc, char* argv[])
 	
 	do
 	{
-		cout<<argv[1]<<": ";
-		
-		bzero(buffer,BUFFER_SIZE);
-		cin.getline(buffer,BUFFER_SIZE);
-
-		write(fd,buffer,BUFFER_SIZE);
-
 		bzero(buffer,BUFFER_SIZE);
 		read(fd,buffer,BUFFER_SIZE);
 
-		cout<<string(buffer)<<endl;
+		string recieved = string(buffer);
+
+		cin.getline(buffer,BUFFER_SIZE);
+
+		write(fd,buffer,strlen(buffer));
+
+		if( string(buffer).find("filedown") == 0 )
+		{
+			string filename = string(buffer).substr(string(buffer).find("filedown ")+1);
+			FILE *file = fopen(filename.c_str(),"w");
+			if(!file)
+			{
+				while( recv(fd,buffer,BUFFER_SIZE,0) )
+				{
+					fwrite(buffer,strlen(buffer),1,file);
+				}
+				fclose(file);
+			}
+			else 
+			{
+				cout<<"Could not create file";
+			}
+		}
+		else if( string(buffer).find("fileup") == 0 )
+		{
+			string filename = string(buffer).substr(string(buffer).find("fileup ")+1);
+			FILE *file = fopen(filename.c_str(),"r");
+			if(!file)
+			{
+				while( fread(buffer,BUFFER_SIZE,1,file) )
+				{
+					write(fd,buffer,strlen(buffer));
+				}
+				fclose(file);
+			}
+			else 
+			{
+				cout<<"File not found!";
+			}
+		}
 
 	} while( string(buffer) != "exit");
 
